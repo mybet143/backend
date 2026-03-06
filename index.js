@@ -87,13 +87,16 @@ const scrapeMarkets = async () => {
   let browser;
 
   try {
-    browser = await puppeteer.launch({
-      headless: "new",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-      ],
-    });
+browser = await puppeteer.launch({
+  headless: "new",
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu"
+  ],
+  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
+});
 
     const page = await browser.newPage();
 
@@ -212,10 +215,16 @@ app.get("/api/chart/:market", async (req, res) => {
 
     const chartUrl = `https://sattamatkadpboss.co/record/${slug}-chart.php`;
 
-    browser = await puppeteer.launch({
-      headless: "new",
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
+ browser = await puppeteer.launch({
+  headless: "new",
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu"
+  ],
+  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
+});
 
     const page = await browser.newPage();
 
