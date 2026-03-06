@@ -98,51 +98,59 @@ const scrapeMarkets = async () => {
     const result = [];
     const seen = new Set();
 
-    $(".news-body > div").each((i, el) => {
+const elements = $(".news-body > div").toArray();
 
-      const text = $(el).text().trim();
+for (const el of elements) {
 
-      if (!text) return;
+  const text = $(el).text().trim();
 
-      const lines = text
-        .split("\n")
-        .map(l => l.trim())
-        .filter(Boolean);
+  if (!text) continue;
 
-      if (!lines.length) return;
+  const lines = text
+    .split("\n")
+    .map(l => l.trim())
+    .filter(Boolean);
 
-      const name = lines[0].replace(/[{}]/g, "").trim();
+  if (!lines.length) continue;
 
-      if (
-        !name ||
-        seen.has(name) ||
-        name.toLowerCase() === "jodi" ||
-        name.toLowerCase() === "panel"
-      ) return;
+  const name = lines[0].replace(/[{}]/g, "").trim();
 
-      seen.add(name);
+  if (
+    !name ||
+    seen.has(name) ||
+    name.toLowerCase() === "jodi" ||
+    name.toLowerCase() === "panel"
+  ) continue;
 
-      const resultMatch = text.match(
-        /\d{2,3}-\d{1,2}-\d{2,3}|\d{2,3}-\d{1,2}|\d{2}/
-      );
+  seen.add(name);
 
-      const timeMatch = text.match(/\([^()]*\)/g);
+  const resultMatch = text.match(
+    /\d{2,3}-\d{1,2}-\d{2,3}|\d{2,3}-\d{1,2}|\d{2}/
+  );
 
-      let marketTime = "";
+  const timeMatch = text.match(/\([^()]*\)/g);
 
-      if (timeMatch && timeMatch.length > 0) {
-        marketTime = timeMatch[timeMatch.length - 1]
-          .replace(/\s+/g, " ")
-          .trim();
-      }
+  let marketTime = "";
 
-      result.push({
-        marketName: name,
-        marketResult: resultMatch ? resultMatch[0] : "",
-        marketTime: marketTime,
-      });
+  if (timeMatch && timeMatch.length > 0) {
+    marketTime = timeMatch[timeMatch.length - 1]
+      .replace(/\s+/g, " ")
+      .trim();
+  }
 
+  const hasChart = await checkChartAvailable(name);
+
+  if (hasChart) {
+    result.push({
+      marketName: name,
+      marketResult: resultMatch ? resultMatch[0] : "",
+      marketTime: marketTime,
     });
+  }
+
+
+
+    };
 
     console.log("TOTAL MARKETS:", result.length);
 
@@ -154,6 +162,47 @@ const scrapeMarkets = async () => {
 
     return [];
   }
+};
+
+
+const checkChartAvailable = async (marketName) => {
+
+  const cacheKey = `chart-${marketName}`;
+
+  const cached = cache.get(cacheKey);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  try {
+
+    const slug = marketName
+      .toLowerCase()
+      .replace(/\s+/g, "-");
+
+    const url = `https://sattamatkadpboss.co/record/${slug}-chart.php`;
+
+    const { data } = await axios.get(url);
+
+    const $ = cheerio.load(data);
+
+    const tables = $("table.chat7");
+
+    const hasChart = tables.length > 0;
+
+    cache.set(cacheKey, hasChart);
+
+    return hasChart;
+
+  } catch {
+
+    cache.set(cacheKey, false);
+
+    return false;
+
+  }
+
 };
 // ================= MATKA API =================
 app.get("/api/matka", async (req, res) => {
@@ -200,7 +249,7 @@ app.get("/api/chart/:market", async (req, res) => {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
       },
-      timeout: 15000
+      timeout: 8000
     });
 
     const $ = cheerio.load(data);
