@@ -88,14 +88,11 @@ const scrapeMarkets = async () => {
 
   try {
 browser = await puppeteer.launch({
-  headless: "new",
+  headless: true,
   args: [
     "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-dev-shm-usage",
-    "--disable-gpu"
-  ],
-  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
+    "--disable-setuid-sandbox"
+  ]
 });
 
     const page = await browser.newPage();
