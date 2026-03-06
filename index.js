@@ -84,91 +84,75 @@ io.on("connection", (socket) => {
 
 
 const scrapeMarkets = async () => {
-  let browser;
-
   try {
-browser = await puppeteer.launch({
-  headless: true,
-  args: [
-    "--no-sandbox",
-    "--disable-setuid-sandbox"
-  ]
-});
 
-    const page = await browser.newPage();
-
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    );
-
-    await page.goto("https://sattamatkadpboss.co", {
-      waitUntil: "networkidle2",
-      timeout: 0,
+    const { data } = await axios.get("https://sattamatkadpboss.co", {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+      timeout: 15000,
     });
 
+    const $ = cheerio.load(data);
 
-const markets = await page.evaluate(() => {
+    const result = [];
+    const seen = new Set();
 
-  const rows = document.querySelectorAll(".news-body > div");
+    $(".news-body > div").each((i, el) => {
 
-  const result = [];
-  const seen = new Set();
+      const text = $(el).text().trim();
 
-  rows.forEach(row => {
+      if (!text) return;
 
-    const text = row.innerText?.trim();
-    if (!text) return;
+      const lines = text
+        .split("\n")
+        .map(l => l.trim())
+        .filter(Boolean);
 
-    const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
-    if (!lines.length) return;
+      if (!lines.length) return;
 
-    const name = lines[0].replace(/[{}]/g, "").trim();
+      const name = lines[0].replace(/[{}]/g, "").trim();
 
-    // ❌ ignore unwanted rows
-    if (
-      !name ||
-      seen.has(name) ||
-      name.toLowerCase() === "jodi" ||
-      name.toLowerCase() === "panel"
-    ) {
-      return;
-    }
+      if (
+        !name ||
+        seen.has(name) ||
+        name.toLowerCase() === "jodi" ||
+        name.toLowerCase() === "panel"
+      ) return;
 
-    seen.add(name);
+      seen.add(name);
 
-    // RESULT
-    const resultMatch = text.match(/\d{2,3}-\d{1,2}-\d{2,3}|\d{2,3}-\d{1,2}|\d{2}/);
+      const resultMatch = text.match(
+        /\d{2,3}-\d{1,2}-\d{2,3}|\d{2,3}-\d{1,2}|\d{2}/
+      );
 
-    // TIME
-    const timeMatch = text.match(/\([^()]*\)/g);
+      const timeMatch = text.match(/\([^()]*\)/g);
 
-    let marketTime = "";
+      let marketTime = "";
 
-    if (timeMatch && timeMatch.length > 0) {
-      marketTime = timeMatch[timeMatch.length - 1]
-        .replace(/\s+/g, " ")
-        .trim();
-    }
+      if (timeMatch && timeMatch.length > 0) {
+        marketTime = timeMatch[timeMatch.length - 1]
+          .replace(/\s+/g, " ")
+          .trim();
+      }
 
-    result.push({
-      marketName: name,
-      marketResult: resultMatch ? resultMatch[0] : "",
-      marketTime: marketTime
+      result.push({
+        marketName: name,
+        marketResult: resultMatch ? resultMatch[0] : "",
+        marketTime: marketTime,
+      });
+
     });
 
-  });
+    console.log("TOTAL MARKETS:", result.length);
 
-  return result;
-});
-
-    await browser.close();
-
-    console.log("TOTAL SCRAPED:", markets.length);
-    return markets;
+    return result;
 
   } catch (err) {
-    if (browser) await browser.close();
-    console.log("PUPPETEER ERROR:", err.message);
+
+    console.log("SCRAPER ERROR:", err.message);
+
     return [];
   }
 };
@@ -203,104 +187,91 @@ app.get("/api/matka", async (req, res) => {
 
 // ================= CHART API =================
 app.get("/api/chart/:market", async (req, res) => {
-  let browser;
 
   try {
+
     const slug = req.params.market
       .toLowerCase()
       .replace(/\s+/g, "-");
 
     const chartUrl = `https://sattamatkadpboss.co/record/${slug}-chart.php`;
 
-browser = await puppeteer.launch({
-  headless: true,
-  args: [
-    "--no-sandbox",
-    "--disable-setuid-sandbox"
-  ]
-});
-
-    const page = await browser.newPage();
-
-    await page.goto(chartUrl, {
-      waitUntil: "domcontentloaded",
-      timeout: 15000,
+    const { data } = await axios.get(chartUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+      },
+      timeout: 15000
     });
 
-    // check if chart table exists
-    const tableExists = await page.$("table.chat7");
+    const $ = cheerio.load(data);
 
-    if (!tableExists) {
-      await browser.close();
+    const tables = $("table.chat7");
+
+    if (!tables.length) {
       return res.json({
         success: true,
         hasChart: false,
-        data: [],
+        data: []
       });
     }
 
-const chartData = await page.evaluate(() => {
-  const tables = document.querySelectorAll("table.chat7");
+    // 🔥 LAST TABLE (same logic as puppeteer)
+    const targetTable = tables.last();
 
-  if (!tables.length) return [];
+    const chartData = [];
 
-  // 🔥 Always pick LAST table (actual chart)
-  const targetTable = tables[tables.length - 1];
+    targetTable.find("tr").each((i, row) => {
 
-  const rows = targetTable.querySelectorAll("tr");
-  const result = [];
+      const cols = [];
 
-  rows.forEach((row) => {
-    const cells = row.querySelectorAll("td");
-
-    if (cells.length === 7) {   // only 7-column rows
-      const rowData = [];
-      cells.forEach((cell) => {
-        rowData.push(cell.innerText.trim());
+      $(row).find("td").each((j, col) => {
+        cols.push($(col).text().trim());
       });
-      result.push(rowData);
+
+      if (cols.length === 7) {
+        chartData.push(cols);
+      }
+
+    });
+
+    // ================= FORCE TODAY CELL LIKE DP BOSS =================
+
+    if (chartData.length > 0) {
+
+      const today = new Date().getDay();
+
+      const columnIndex = today === 0 ? 6 : today - 1;
+
+      const lastRowIndex = chartData.length - 1;
+
+      if (
+        chartData[lastRowIndex] &&
+        chartData[lastRowIndex][columnIndex]
+      ) {
+        chartData[lastRowIndex][columnIndex] = "**";
+      }
+
     }
-  });
-
-  return result;
-});
-
-// ================= FORCE TODAY CELL LIKE DP BOSS =================
-
-if (chartData.length > 0) {
-  const today = new Date().getDay(); 
-  // 0 = Sunday, 1 = Monday ... 6 = Saturday
-
-  // Convert Sunday to last column index
-  const columnIndex = today === 0 ? 6 : today - 1;
-
-  const lastRowIndex = chartData.length - 1;
-
-  if (
-    chartData[lastRowIndex] &&
-    chartData[lastRowIndex][columnIndex]
-  ) {
-    chartData[lastRowIndex][columnIndex] = "**";
-  }
-}
-
-    await browser.close();
 
     res.json({
       success: true,
       hasChart: true,
-      data: chartData,
+      data: chartData
     });
 
   } catch (err) {
-    if (browser) await browser.close();
+
+    console.log("CHART ERROR:", err.message);
 
     res.json({
       success: true,
       hasChart: false,
-      data: [],
+      data: []
     });
+
   }
+
 });
 
 // ================= ADMIN MARKETS =================
