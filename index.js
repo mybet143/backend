@@ -55,23 +55,7 @@ app.get("/", (req,res)=>{
 
 /* ================= SOCKET ================= */
 
-io.on("connection",(socket)=>{
 
-  socket.on("joinMarket",(marketName)=>{
-    socket.join(marketName);
-  });
-
-  socket.on("sendMessage",async({marketName,username,message})=>{
-    const newMessage = await Message.create({
-      marketName,
-      username,
-      message
-    });
-
-    io.to(marketName).emit("receiveMessage",newMessage);
-  });
-
-});
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -140,10 +124,6 @@ const updateMarkets = async ()=>{
     console.log("AUTO SCRAPER ERROR")
   }
 }
-
-updateMarkets()
-setInterval(updateMarkets,60000)
-
 
 
 const fetchHTML = async (url) => {
@@ -277,10 +257,12 @@ app.get("/api/matka", async (req, res) => {
 
 let controls = [];
 
-try {
-  controls = await MarketControl.find().lean();
-} catch (err) {
-  console.log("DB ERROR:", err.message);
+if (mongoose.connection.readyState === 1) {
+  try {
+    controls = await MarketControl.find().lean();
+  } catch (err) {
+    console.log("DB ERROR:", err.message);
+  }
 }
 
     const visibilityMap = {};
@@ -588,6 +570,7 @@ app.get("/api/banner", async (req, res) => {
 const PORT = process.env.PORT || 8000;
 
 const startServer = async () => {
+
   try {
 
     await mongoose.connect(process.env.MONGO_URI,{
@@ -597,11 +580,18 @@ const startServer = async () => {
     console.log("MongoDB Connected ✅");
 
     server.listen(PORT,()=>{
+
       console.log(`Server running on port ${PORT}`);
+
+      updateMarkets()
+      setInterval(updateMarkets,120000)
+
     });
 
   } catch(err){
     console.log("Mongo Error:",err.message);
   }
+
 };
+
 startServer();
