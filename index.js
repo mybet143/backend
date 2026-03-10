@@ -28,19 +28,6 @@ const cache = new NodeCache({ stdTTL: 300 });
 
 
 
-// ================= MONGODB =================
-// mongoose.connect(process.env.MONGO_URI,{
-//   useNewUrlParser:true,
-//   useUnifiedTopology:true,
-//   serverSelectionTimeoutMS:5000
-// })
-// .then(()=>{
-//   console.log("MongoDB Connected ✅")
-// })
-// .catch(err=>{
-//   console.log("Mongo Error:",err.message)
-// })
-
 
 
 
@@ -121,8 +108,7 @@ const updateMarkets = async ()=>{
 }
 
 updateMarkets()
-
-setInterval(updateMarkets,15000)
+setInterval(updateMarkets,60000)
 
 
 
@@ -137,7 +123,7 @@ const fetchHTML = async (url) => {
         Accept: "text/html,application/xhtml+xml",
         Connection: "keep-alive"
       },
-      timeout: 10000
+    timeout: 7000
     });
 
     return response.data;
@@ -320,7 +306,7 @@ const urls = [
 
         const response = await axios.get(url, {
           headers: { "User-Agent": "Mozilla/5.0" },
-          timeout: 8000
+         timeout: 7000
         });
 
         html = response.data;
@@ -564,42 +550,24 @@ app.get("/api/banner", async (req, res) => {
 });
 
 
-// ================= AUTO SCRAPER =================
-
-setInterval(async () => {
-  try {
-    const markets = await scrapeMarkets();
-
-    if (markets.length) {
-      cache.set("markets", markets);
-
-      io.emit("marketsUpdate", markets);
-
-      console.log("AUTO UPDATE SUCCESS");
-    }
-  } catch (err) {
-    console.log("AUTO SCRAPER ERROR");
-  }
-}, 60000);
-
 // ================= START =================
 const PORT = process.env.PORT || 8000;
 
-
 const startServer = async () => {
-  try{
+  try {
 
- await mongoose.connect(process.env.MONGO_URI)
+    await mongoose.connect(process.env.MONGO_URI,{
+      serverSelectionTimeoutMS:30000
+    });
 
-    console.log("MongoDB Connected ✅")
+    console.log("MongoDB Connected ✅");
 
     server.listen(PORT,()=>{
-      console.log(`Server running on port ${PORT}`)
-    })
+      console.log(`Server running on port ${PORT}`);
+    });
 
-  }catch(err){
-    console.log("Mongo Error:",err.message)
+  } catch(err){
+    console.log("Mongo Error:",err.message);
   }
-}
-
-startServer()
+};
+startServer();
