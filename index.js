@@ -224,7 +224,13 @@ app.get("/api/matka", async (req, res) => {
       }
     }
 
-    const controls = await MarketControl.find().lean();
+let controls = [];
+
+try {
+  controls = await MarketControl.find().lean();
+} catch (err) {
+  console.log("DB ERROR:", err.message);
+}
 
     const visibilityMap = {};
     controls.forEach((c) => {
