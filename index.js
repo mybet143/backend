@@ -29,9 +29,17 @@ const cache = new NodeCache({ stdTTL: 300 });
 
 
 // ================= MONGODB =================
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB Connected ✅"))
-  .catch(err => console.log("Mongo Error:", err));
+// mongoose.connect(process.env.MONGO_URI,{
+//   useNewUrlParser:true,
+//   useUnifiedTopology:true,
+//   serverSelectionTimeoutMS:5000
+// })
+// .then(()=>{
+//   console.log("MongoDB Connected ✅")
+// })
+// .catch(err=>{
+//   console.log("Mongo Error:",err.message)
+// })
 
 
 
@@ -88,10 +96,33 @@ io.on("connection", (socket) => {
 const SOURCES = [
 
   "https://dpboss.net.in",
- 
+   "https://sattamatka.world/",
   "https://spboss.mobi/"
 
 ];
+
+
+let marketsCache=[]
+
+const updateMarkets = async ()=>{
+  try{
+    const markets = await scrapeMarkets()
+
+    if(markets.length){
+      marketsCache = markets
+      cache.set("markets",markets)
+      io.emit("marketsUpdate",markets)
+      console.log("AUTO UPDATE SUCCESS")
+    }
+
+  }catch(e){
+    console.log("AUTO SCRAPER ERROR")
+  }
+}
+
+updateMarkets()
+
+setInterval(updateMarkets,15000)
 
 
 
@@ -106,7 +137,7 @@ const fetchHTML = async (url) => {
         Accept: "text/html,application/xhtml+xml",
         Connection: "keep-alive"
       },
-      timeout: 20000
+      timeout: 10000
     });
 
     return response.data;
@@ -127,13 +158,13 @@ $("body *").each((i,el)=>{
 
 const text=$(el).text().trim()
 
-const match=text.match(/([A-Za-z ]+)\s+(\d{2,3}-\d{1,2}-\d{2,3}|\d{2,3}-\d{1,2}|Loading)/i)
+const match = text.match(/([A-Za-z ]+)\s+(\d{2,3}\s*-\s*\d{1,2}\s*-\s*\d{2,3}|\d{2,3}\s*-\s*\d{1,2}|Loading)/i)
 const timeMatch=text.match(/(\d{1,2}:\d{2}\s?(AM|PM))\s*(\d{1,2}:\d{2}\s?(AM|PM))/i)
 
 if(match){
 
 const name=match[1].trim()
-let result = match[2].trim()
+let result = match[2].replace(/\s+/g,"").trim()
 
 if(result.toLowerCase()==="loading"){
 result=""
@@ -553,6 +584,22 @@ setInterval(async () => {
 
 // ================= START =================
 const PORT = process.env.PORT || 8000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+
+
+const startServer = async () => {
+  try{
+
+ await mongoose.connect(process.env.MONGO_URI)
+
+    console.log("MongoDB Connected ✅")
+
+    server.listen(PORT,()=>{
+      console.log(`Server running on port ${PORT}`)
+    })
+
+  }catch(err){
+    console.log("Mongo Error:",err.message)
+  }
+}
+
+startServer()
