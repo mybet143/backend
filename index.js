@@ -19,7 +19,7 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 const Banner = require("./models/Banner");
 const auth = require("./middleware/auth");
-const puppeteer = require("puppeteer")
+
 app.use(cors());
 app.use(express.json());
 // Serve uploaded images
@@ -96,29 +96,26 @@ const SOURCES = [
 
 
 const fetchHTML = async (url) => {
+  try {
 
-const browser = await puppeteer.launch({
-headless: "new",
-args: ["--no-sandbox","--disable-setuid-sandbox"]
-})
+    const response = await axios.get(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+        Accept: "text/html,application/xhtml+xml",
+        Connection: "keep-alive"
+      },
+      timeout: 20000
+    });
 
-const page = await browser.newPage()
+    return response.data;
 
-await page.setUserAgent(
-"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
-)
-
-await page.goto(url,{
-waitUntil:"domcontentloaded",
-timeout:60000
-})
-
-const html = await page.content()
-
-await browser.close()
-
-return html
-}
+  } catch (err) {
+    console.log("SCRAPE ERROR:", url);
+    throw err;
+  }
+};
 
 const parseMarkets = (html) => {
 
