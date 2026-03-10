@@ -11,33 +11,67 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const path = require("path");
+
 const Admin = require("./models/Admin");
 const Message = require("./models/Message");
 const MarketControl = require("./models/MarketControl");
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
 const Banner = require("./models/Banner");
 const auth = require("./middleware/auth");
 
-app.use(cors());
+const app = express();
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: [
+      "http://localhost:5173",
+      "https://mybet.mobi",
+      "https://www.mybet.mobi"
+    ]
+  }
+});
+
+let mongoConnected = false;
+
+app.use(cors({
+  origin:[
+    "http://localhost:5173",
+    "https://mybet.mobi",
+    "https://www.mybet.mobi"
+  ],
+  credentials:true
+}));
+
 app.use(express.json());
-// Serve uploaded images
 app.use("/uploads", express.static("uploads"));
+
 const cache = new NodeCache({ stdTTL: 300 });
 
+/* ================= BASIC ROUTE ================= */
 
+app.get("/", (req,res)=>{
+  res.send("Backend Running 🚀");
+});
 
+/* ================= SOCKET ================= */
 
+io.on("connection",(socket)=>{
 
+  socket.on("joinMarket",(marketName)=>{
+    socket.join(marketName);
+  });
 
+  socket.on("sendMessage",async({marketName,username,message})=>{
+    const newMessage = await Message.create({
+      marketName,
+      username,
+      message
+    });
 
+    io.to(marketName).emit("receiveMessage",newMessage);
+  });
 
-  // ================= IMAGE UPLOAD CONFIG =================
-
-
-
-
+});
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
